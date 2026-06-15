@@ -1,0 +1,824 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Political Keys Teleprompter</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bg: #0a0a0f;
+    --surface: #111118;
+    --border: #1e1e2e;
+    --accent: #c8a96e;
+    --accent-dim: #7a6540;
+    --text-prompt: #f0e8d8;
+    --text-highlight: #c8a96e;
+    --text-ui: #8888aa;
+    --text-ui-bright: #ccccdd;
+    --red: #e05a5a;
+    --green: #5ae08a;
+    --speed-bar: #1a1a28;
+  }
+
+  html, body {
+    width: 100%; height: 100%;
+    background: var(--bg);
+    font-family: 'Cairo', sans-serif;
+    overflow: hidden;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+  }
+
+  /* ── SCREENS ── */
+  #screen-edit, #screen-prompt {
+    position: absolute; inset: 0;
+    transition: opacity .3s ease;
+  }
+  #screen-prompt { opacity: 0; pointer-events: none; }
+  body.prompting #screen-edit  { opacity: 0; pointer-events: none; }
+  body.prompting #screen-prompt { opacity: 1; pointer-events: all; }
+
+  /* ══════════════════════════════
+     EDIT SCREEN
+  ══════════════════════════════ */
+  #screen-edit {
+    display: flex; flex-direction: column;
+    padding: 28px 32px 20px;
+    gap: 16px;
+  }
+
+  .edit-header {
+    display: flex; align-items: center; justify-content: space-between;
+    flex-shrink: 0;
+  }
+  .brand {
+    font-size: 13px; font-weight: 700; letter-spacing: .12em;
+    color: var(--accent); text-transform: uppercase;
+  }
+  .brand span { color: var(--text-ui); font-weight: 400; }
+
+  #btn-start {
+    background: var(--accent);
+    color: #0a0a0f;
+    border: none; border-radius: 10px;
+    padding: 12px 28px;
+    font-family: 'Cairo', sans-serif;
+    font-size: 15px; font-weight: 700;
+    cursor: pointer;
+    transition: background .2s;
+  }
+  #btn-start:active { background: var(--accent-dim); }
+
+  #script-input {
+    flex: 1;
+    width: 100%;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 20px 22px;
+    color: var(--text-prompt);
+    font-family: 'Cairo', sans-serif;
+    font-size: 22px;
+    line-height: 1.9;
+    resize: none;
+    outline: none;
+    direction: rtl;
+    text-align: right;
+  }
+  #script-input::placeholder { color: #333348; }
+  #script-input:focus { border-color: var(--accent-dim); }
+
+  .edit-controls {
+    display: flex; gap: 12px; align-items: center; flex-wrap: wrap;
+    flex-shrink: 0;
+  }
+  .ctrl-group {
+    display: flex; align-items: center; gap: 8px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 14px;
+  }
+  .ctrl-label {
+    font-size: 12px; color: var(--text-ui); white-space: nowrap;
+  }
+  .ctrl-group input[type=range] {
+    width: 90px; accent-color: var(--accent); cursor: pointer;
+  }
+  .ctrl-val {
+    font-size: 13px; font-weight: 700;
+    color: var(--accent); min-width: 26px; text-align: center;
+  }
+
+  /* ══════════════════════════════
+     PROMPT SCREEN
+  ══════════════════════════════ */
+  #screen-prompt {
+    display: flex; flex-direction: column;
+    background: var(--bg);
+  }
+
+  /* top bar */
+  .prompt-bar {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 22px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+    gap: 12px;
+  }
+
+  /* mic section */
+  .mic-section {
+    display: flex; align-items: center; gap: 10px;
+  }
+  #btn-mic {
+    width: 46px; height: 46px; border-radius: 50%;
+    border: 2px solid var(--border);
+    background: var(--surface);
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; transition: all .2s; flex-shrink: 0;
+  }
+  #btn-mic svg { width: 20px; height: 20px; }
+  #btn-mic.listening {
+    border-color: var(--red);
+    background: rgba(224,90,90,.12);
+    animation: pulse 1.2s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    0%,100% { box-shadow: 0 0 0 0 rgba(224,90,90,.3); }
+    50% { box-shadow: 0 0 0 8px rgba(224,90,90,0); }
+  }
+
+  .mic-status {
+    font-size: 12px; color: var(--text-ui); min-width: 60px;
+  }
+  .mic-status.active { color: var(--red); }
+
+  /* progress */
+  .progress-wrap {
+    flex: 1; height: 6px; background: var(--speed-bar);
+    border-radius: 3px; overflow: hidden;
+  }
+  #progress-bar {
+    height: 100%; width: 0%;
+    background: var(--accent);
+    border-radius: 3px;
+    transition: width .4s linear;
+  }
+
+  /* playback controls */
+  .playback-controls {
+    display: flex; align-items: center; gap: 8px;
+  }
+  .pb-btn {
+    width: 38px; height: 38px; border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text-ui-bright);
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; font-size: 16px; transition: all .15s;
+  }
+  .pb-btn:active { background: var(--border); }
+  #btn-play-pause {
+    width: 46px; height: 46px; border-radius: 50%;
+    background: var(--accent);
+    border: none; color: #0a0a0f;
+    font-size: 18px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: background .2s;
+  }
+  #btn-play-pause:active { background: var(--accent-dim); }
+  #btn-stop {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text-ui);
+    font-size: 12px; font-family: 'Cairo', sans-serif;
+    padding: 0 12px; border-radius: 8px;
+    height: 38px; cursor: pointer; white-space: nowrap;
+  }
+
+  /* speed slider on prompt screen */
+  .speed-row {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 22px;
+    background: var(--speed-bar);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .speed-row label { font-size: 12px; color: var(--text-ui); }
+  .speed-row input[type=range] { flex: 1; accent-color: var(--accent); }
+  #speed-display { font-size: 12px; font-weight: 700; color: var(--accent); min-width: 30px; }
+
+  /* scroll viewport */
+  #scroll-viewport {
+    flex: 1;
+    overflow: hidden;
+    position: relative;
+  }
+
+  /* mirror overlay */
+  #mirror-overlay {
+    position: absolute; inset: 0;
+    pointer-events: none;
+    z-index: 10;
+  }
+  #mirror-overlay.active {
+    transform: scaleX(-1);
+  }
+
+  /* gradient masks */
+  #scroll-viewport::before,
+  #scroll-viewport::after {
+    content: ''; position: absolute; left: 0; right: 0; z-index: 5;
+    pointer-events: none;
+  }
+  #scroll-viewport::before {
+    top: 0; height: 120px;
+    background: linear-gradient(to bottom, var(--bg), transparent);
+  }
+  #scroll-viewport::after {
+    bottom: 0; height: 120px;
+    background: linear-gradient(to top, var(--bg), transparent);
+  }
+
+  /* reading cursor line */
+  #cursor-line {
+    position: absolute;
+    left: 5%; right: 5%;
+    height: 3px;
+    background: var(--accent);
+    border-radius: 2px;
+    opacity: .5;
+    z-index: 6;
+    box-shadow: 0 0 18px 2px rgba(200,169,110,.35);
+    pointer-events: none;
+  }
+
+  /* scrolling text */
+  #scroll-content {
+    position: absolute;
+    left: 0; right: 0;
+    padding: 0 48px;
+    text-align: right;
+    direction: rtl;
+    will-change: transform;
+  }
+
+  #scroll-content p {
+    font-size: var(--prompt-font-size, 42px);
+    line-height: 1.85;
+    color: var(--text-prompt);
+    margin-bottom: 32px;
+    transition: color .3s;
+  }
+  #scroll-content p.active-line {
+    color: var(--text-highlight);
+    text-shadow: 0 0 24px rgba(200,169,110,.25);
+  }
+
+  /* word highlight when voice active */
+  .word-highlight {
+    background: rgba(200,169,110,.18);
+    border-radius: 4px;
+    color: var(--text-highlight);
+    padding: 0 2px;
+  }
+
+  /* voice indicator overlay */
+  #voice-indicator {
+    position: absolute;
+    bottom: 24px; left: 50%; transform: translateX(-50%);
+    background: rgba(10,10,15,.88);
+    border: 1px solid var(--border);
+    border-radius: 30px;
+    padding: 8px 20px;
+    font-size: 13px;
+    color: var(--text-ui);
+    z-index: 20;
+    display: none;
+    backdrop-filter: blur(8px);
+    white-space: nowrap;
+  }
+  #voice-indicator.visible { display: block; }
+  #voice-indicator .dot {
+    display: inline-block; width: 7px; height: 7px;
+    border-radius: 50%; background: var(--red);
+    margin-left: 6px;
+    animation: blink .8s ease-in-out infinite;
+  }
+  @keyframes blink { 0%,100% { opacity: 1; } 50% { opacity: .2; } }
+
+  /* no-speech warning */
+  #voice-warning {
+    display: none;
+    padding: 6px 22px;
+    background: rgba(224,90,90,.1);
+    border-bottom: 1px solid rgba(224,90,90,.2);
+    font-size: 12px; color: var(--red); text-align: center; flex-shrink: 0;
+  }
+  #voice-warning.visible { display: block; }
+
+  /* font size control in edit */
+  .font-preview {
+    font-size: 13px; color: var(--accent);
+    font-weight: 700;
+  }
+
+  /* mirror toggle */
+  #btn-mirror {
+    width: 38px; height: 38px; border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text-ui);
+    font-size: 17px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+  }
+  #btn-mirror.on { border-color: var(--accent-dim); color: var(--accent); }
+
+  /* fullscreen hint */
+  .fs-hint {
+    font-size: 11px; color: var(--text-ui); opacity: .5; flex-shrink: 0;
+  }
+
+</style>
+</head>
+<body>
+
+<!-- ══ EDIT SCREEN ══ -->
+<div id="screen-edit">
+  <div class="edit-header">
+    <div class="brand">Political Keys <span>/ Teleprompter</span></div>
+    <button id="btn-start">▶ بدء القراءة</button>
+  </div>
+
+  <textarea id="script-input" placeholder="الصق نص السكريبت هنا...
+يمكنك كتابة أكثر من فقرة.
+
+يدعم البرنامج التمرير التلقائي مع التعرف على الصوت العربي لتتبع موقعك في النص."></textarea>
+
+  <div class="edit-controls">
+    <div class="ctrl-group">
+      <span class="ctrl-label">السرعة</span>
+      <input type="range" id="speed-slider-edit" min="10" max="120" value="40">
+      <span class="ctrl-val" id="speed-val-edit">40</span>
+    </div>
+    <div class="ctrl-group">
+      <span class="ctrl-label">حجم الخط</span>
+      <input type="range" id="font-slider" min="28" max="80" value="42">
+      <span class="ctrl-val font-preview" id="font-val">42</span>
+    </div>
+  </div>
+</div>
+
+<!-- ══ PROMPT SCREEN ══ -->
+<div id="screen-prompt">
+
+  <div class="prompt-bar">
+    <!-- mic -->
+    <div class="mic-section">
+      <button id="btn-mic" title="التعرف على الصوت">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+             stroke-linecap="round" stroke-linejoin="round">
+          <rect x="9" y="2" width="6" height="12" rx="3"/>
+          <path d="M5 10a7 7 0 0 0 14 0"/>
+          <line x1="12" y1="19" x2="12" y2="22"/>
+          <line x1="8" y1="22" x2="16" y2="22"/>
+        </svg>
+      </button>
+      <span class="mic-status" id="mic-status">إيقاف</span>
+    </div>
+
+    <!-- progress -->
+    <div class="progress-wrap">
+      <div id="progress-bar"></div>
+    </div>
+
+    <!-- controls -->
+    <div class="playback-controls">
+      <button class="pb-btn" id="btn-slower" title="أبطأ">–</button>
+      <button id="btn-play-pause">⏸</button>
+      <button class="pb-btn" id="btn-faster" title="أسرع">+</button>
+      <button id="btn-mirror" title="عكس">⟺</button>
+      <button id="btn-stop">✕ إنهاء</button>
+    </div>
+  </div>
+
+  <div class="speed-row">
+    <label>السرعة</label>
+    <input type="range" id="speed-slider-prompt" min="10" max="120" value="40">
+    <span id="speed-display">40</span>
+  </div>
+
+  <div id="voice-warning">لم يُكتشف صوت. تأكد من السماح بالوصول إلى الميكروفون.</div>
+
+  <div id="scroll-viewport">
+    <div id="cursor-line"></div>
+    <div id="scroll-content"></div>
+    <div id="mirror-overlay"></div>
+    <div id="voice-indicator"><span class="dot"></span> يستمع...</div>
+  </div>
+
+</div>
+
+<script>
+// ══════════════════════════════════════
+//  STATE
+// ══════════════════════════════════════
+const state = {
+  speed: 40,          // px/s
+  fontSize: 42,       // px
+  playing: false,
+  mirror: false,
+  scrollY: 0,
+  contentH: 0,
+  viewportH: 0,
+  raf: null,
+  lastTs: null,
+  words: [],          // {el, text, para, idx}
+  currentWordIdx: -1,
+  recognition: null,
+  micActive: false,
+  noSpeechTimer: null,
+};
+
+// ══════════════════════════════════════
+//  ELEMENTS
+// ══════════════════════════════════════
+const elBody          = document.body;
+const elInput         = document.getElementById('script-input');
+const elContent       = document.getElementById('scroll-content');
+const elViewport      = document.getElementById('scroll-viewport');
+const elCursor        = document.getElementById('cursor-line');
+const elProgress      = document.getElementById('progress-bar');
+const elMicBtn        = document.getElementById('btn-mic');
+const elMicStatus     = document.getElementById('mic-status');
+const elVoiceInd      = document.getElementById('voice-indicator');
+const elVoiceWarn     = document.getElementById('voice-warning');
+const elBtnStart      = document.getElementById('btn-start');
+const elBtnStop       = document.getElementById('btn-stop');
+const elBtnPlay       = document.getElementById('btn-play-pause');
+const elBtnSlower     = document.getElementById('btn-slower');
+const elBtnFaster     = document.getElementById('btn-faster');
+const elBtnMirror     = document.getElementById('btn-mirror');
+const elSpeedEdit     = document.getElementById('speed-slider-edit');
+const elSpeedValEdit  = document.getElementById('speed-val-edit');
+const elSpeedPrompt   = document.getElementById('speed-slider-prompt');
+const elSpeedDisplay  = document.getElementById('speed-display');
+const elFontSlider    = document.getElementById('font-slider');
+const elFontVal       = document.getElementById('font-val');
+const elMirrorOverlay = document.getElementById('mirror-overlay');
+
+// ══════════════════════════════════════
+//  EDIT CONTROLS
+// ══════════════════════════════════════
+function setSpeed(v) {
+  state.speed = +v;
+  elSpeedEdit.value = v;
+  elSpeedValEdit.textContent = v;
+  elSpeedPrompt.value = v;
+  elSpeedDisplay.textContent = v;
+}
+elSpeedEdit.addEventListener('input', e => setSpeed(e.target.value));
+elSpeedPrompt.addEventListener('input', e => setSpeed(e.target.value));
+
+elFontSlider.addEventListener('input', e => {
+  state.fontSize = +e.target.value;
+  elFontVal.textContent = e.target.value;
+  elContent.style.setProperty('--prompt-font-size', state.fontSize + 'px');
+});
+
+// ══════════════════════════════════════
+//  BUILD CONTENT
+// ══════════════════════════════════════
+function buildContent(text) {
+  elContent.innerHTML = '';
+  state.words = [];
+
+  const paras = text.split(/\n+/).filter(p => p.trim());
+  paras.forEach((para, pi) => {
+    const p = document.createElement('p');
+    const wordsInPara = para.trim().split(/\s+/);
+    wordsInPara.forEach((w, wi) => {
+      const span = document.createElement('span');
+      span.textContent = w + ' ';
+      span.dataset.word = normalize(w);
+      span.dataset.para = pi;
+      span.dataset.idx = state.words.length;
+      p.appendChild(span);
+      state.words.push({ el: span, text: normalize(w), para: pi, idx: state.words.length });
+    });
+    elContent.appendChild(p);
+  });
+
+  state.currentWordIdx = -1;
+  state.scrollY = 0;
+  applyScroll();
+  updateProgress();
+}
+
+function normalize(str) {
+  return str
+    .replace(/[\u064B-\u065F\u0670]/g, '') // strip diacritics
+    .replace(/[أإآا]/g, 'ا')
+    .replace(/[ىي]/g, 'ي')
+    .replace(/ة/g, 'ه')
+    .replace(/[^\u0600-\u06FF\w]/g, '')
+    .toLowerCase();
+}
+
+// ══════════════════════════════════════
+//  SCROLL ENGINE
+// ══════════════════════════════════════
+function applyScroll() {
+  elContent.style.transform = `translateY(${-state.scrollY}px)`;
+}
+
+function updateProgress() {
+  const max = Math.max(1, state.contentH - state.viewportH);
+  elProgress.style.width = Math.min(100, (state.scrollY / max) * 100) + '%';
+}
+
+function measureSizes() {
+  state.viewportH = elViewport.clientHeight;
+  state.contentH  = elContent.scrollHeight;
+  // place cursor line at 30% from top
+  elCursor.style.top = Math.round(state.viewportH * 0.30) + 'px';
+}
+
+function tick(ts) {
+  if (state.lastTs === null) state.lastTs = ts;
+  const dt = (ts - state.lastTs) / 1000;
+  state.lastTs = ts;
+
+  if (state.playing) {
+    state.scrollY += state.speed * dt;
+    const max = Math.max(0, state.contentH - state.viewportH + 60);
+    if (state.scrollY >= max) {
+      state.scrollY = max;
+      state.playing = false;
+      elBtnPlay.textContent = '▶';
+    }
+    applyScroll();
+    updateProgress();
+  }
+
+  state.raf = requestAnimationFrame(tick);
+}
+
+// ══════════════════════════════════════
+//  PLAYBACK
+// ══════════════════════════════════════
+function startPrompt() {
+  const text = elInput.value.trim();
+  if (!text) return;
+
+  buildContent(text);
+
+  setTimeout(() => {
+    measureSizes();
+    // pad top so first word appears at cursor line
+    const padTop = state.viewportH * 0.30;
+    elContent.style.paddingTop = padTop + 'px';
+    state.contentH = elContent.scrollHeight;
+
+    state.playing = true;
+    state.scrollY = 0;
+    state.lastTs = null;
+    elBtnPlay.textContent = '⏸';
+    elBody.classList.add('prompting');
+    state.raf = requestAnimationFrame(tick);
+  }, 50);
+}
+
+function stopPrompt() {
+  elBody.classList.remove('prompting');
+  state.playing = false;
+  cancelAnimationFrame(state.raf);
+  stopMic();
+}
+
+elBtnStart.addEventListener('click', startPrompt);
+elBtnStop.addEventListener('click', stopPrompt);
+
+elBtnPlay.addEventListener('click', () => {
+  state.playing = !state.playing;
+  state.lastTs = null;
+  elBtnPlay.textContent = state.playing ? '⏸' : '▶';
+});
+
+elBtnSlower.addEventListener('click', () => setSpeed(Math.max(10, state.speed - 5)));
+elBtnFaster.addEventListener('click', () => setSpeed(Math.min(120, state.speed + 5)));
+
+elBtnMirror.addEventListener('click', () => {
+  state.mirror = !state.mirror;
+  elBtnMirror.classList.toggle('on', state.mirror);
+  elMirrorOverlay.classList.toggle('active', state.mirror);
+  if (state.mirror) {
+    elContent.style.transform += ' scaleX(-1)';
+  } else {
+    applyScroll();
+  }
+});
+
+// ══════════════════════════════════════
+//  VOICE RECOGNITION
+// ══════════════════════════════════════
+const SpeechRecognition =
+  window.SpeechRecognition || window.webkitSpeechRecognition;
+
+function initRecognition() {
+  if (!SpeechRecognition) return null;
+
+  const rec = new SpeechRecognition();
+  rec.lang = 'ar-EG';
+  rec.continuous = true;
+  rec.interimResults = true;
+  rec.maxAlternatives = 3;
+
+  rec.onstart = () => {
+    elMicBtn.classList.add('listening');
+    elMicStatus.textContent = 'نشط';
+    elMicStatus.classList.add('active');
+    elVoiceInd.classList.add('visible');
+    elVoiceWarn.classList.remove('visible');
+    clearNoSpeech();
+  };
+
+  rec.onspeechstart = () => clearNoSpeech();
+
+  rec.onnomatch = () => triggerNoSpeech();
+
+  rec.onerror = (e) => {
+    if (e.error === 'no-speech') triggerNoSpeech();
+    else if (e.error === 'not-allowed') {
+      elVoiceWarn.textContent = 'لم يُسمح بالوصول للميكروفون. تحقق من إعدادات Safari.';
+      elVoiceWarn.classList.add('visible');
+      stopMic();
+    }
+  };
+
+  rec.onend = () => {
+    if (state.micActive) {
+      // auto-restart
+      try { rec.start(); } catch(e){}
+    } else {
+      elMicBtn.classList.remove('listening');
+      elMicStatus.textContent = 'إيقاف';
+      elMicStatus.classList.remove('active');
+      elVoiceInd.classList.remove('visible');
+    }
+  };
+
+  rec.onresult = (event) => {
+    clearNoSpeech();
+    let transcript = '';
+    for (let i = event.resultIndex; i < event.results.length; i++) {
+      const alt = event.results[i];
+      // collect all alternatives
+      const candidates = [];
+      for (let a = 0; a < alt.length; a++) {
+        candidates.push(normalize(alt[a].transcript));
+      }
+      transcript = candidates.join(' ');
+    }
+    if (transcript) matchVoiceToScript(transcript);
+  };
+
+  return rec;
+}
+
+function triggerNoSpeech() {
+  elVoiceWarn.textContent = 'لم يُكتشف صوت. تحدث بوضوح باللغة العربية.';
+  elVoiceWarn.classList.add('visible');
+  state.noSpeechTimer = setTimeout(() => {
+    elVoiceWarn.classList.remove('visible');
+  }, 4000);
+}
+
+function clearNoSpeech() {
+  elVoiceWarn.classList.remove('visible');
+  if (state.noSpeechTimer) { clearTimeout(state.noSpeechTimer); state.noSpeechTimer = null; }
+}
+
+function startMic() {
+  if (!SpeechRecognition) {
+    elVoiceWarn.textContent = 'المتصفح لا يدعم التعرف على الصوت. استخدم Safari على iPad.';
+    elVoiceWarn.classList.add('visible');
+    return;
+  }
+  state.recognition = initRecognition();
+  state.micActive = true;
+  try { state.recognition.start(); } catch(e){}
+}
+
+function stopMic() {
+  state.micActive = false;
+  if (state.recognition) {
+    try { state.recognition.stop(); } catch(e){}
+    state.recognition = null;
+  }
+  elMicBtn.classList.remove('listening');
+  elMicStatus.textContent = 'إيقاف';
+  elMicStatus.classList.remove('active');
+  elVoiceInd.classList.remove('visible');
+}
+
+elMicBtn.addEventListener('click', () => {
+  if (state.micActive) stopMic();
+  else startMic();
+});
+
+// ══════════════════════════════════════
+//  VOICE ↔ SCRIPT MATCHING
+// ══════════════════════════════════════
+function matchVoiceToScript(transcript) {
+  const spoken = transcript.split(/\s+/).filter(Boolean);
+  if (!spoken.length || !state.words.length) return;
+
+  const searchFrom = Math.max(0, state.currentWordIdx - 2);
+  const searchTo   = Math.min(state.words.length - 1, state.currentWordIdx + 30);
+
+  let bestScore = -1;
+  let bestIdx   = -1;
+
+  for (let i = searchFrom; i <= searchTo; i++) {
+    let score = 0;
+    for (let j = 0; j < spoken.length && i + j < state.words.length; j++) {
+      if (wordMatch(spoken[j], state.words[i + j].text)) score++;
+    }
+    const norm = score / Math.max(spoken.length, 1);
+    if (norm > bestScore && score >= Math.min(2, spoken.length)) {
+      bestScore = norm;
+      bestIdx   = i;
+    }
+  }
+
+  if (bestIdx >= 0 && bestIdx !== state.currentWordIdx) {
+    highlightWord(bestIdx);
+    scrollToWord(bestIdx);
+  }
+}
+
+function wordMatch(a, b) {
+  if (a === b) return true;
+  // partial prefix match (handles partial hearing)
+  if (a.length >= 3 && b.startsWith(a.slice(0, 3))) return true;
+  if (b.length >= 3 && a.startsWith(b.slice(0, 3))) return true;
+  return false;
+}
+
+function highlightWord(idx) {
+  // clear old
+  if (state.currentWordIdx >= 0 && state.words[state.currentWordIdx]) {
+    state.words[state.currentWordIdx].el.classList.remove('word-highlight');
+    // un-highlight old para
+    const oldPara = state.words[state.currentWordIdx].el.closest('p');
+    if (oldPara) oldPara.classList.remove('active-line');
+  }
+
+  state.currentWordIdx = idx;
+  const w = state.words[idx];
+  if (!w) return;
+
+  w.el.classList.add('word-highlight');
+  const para = w.el.closest('p');
+  if (para) para.classList.add('active-line');
+}
+
+function scrollToWord(idx) {
+  const w = state.words[idx];
+  if (!w) return;
+
+  const rect  = w.el.getBoundingClientRect();
+  const vpRect = elViewport.getBoundingClientRect();
+  const targetY = state.scrollY + (rect.top - vpRect.top) - (state.viewportH * 0.30);
+
+  // smooth jump — don't jump more than 300px to avoid disorientation
+  const diff = targetY - state.scrollY;
+  if (Math.abs(diff) > 20 && Math.abs(diff) < 500) {
+    state.scrollY = targetY;
+  }
+}
+
+// ══════════════════════════════════════
+//  RESIZE
+// ══════════════════════════════════════
+window.addEventListener('resize', measureSizes);
+window.addEventListener('orientationchange', () => {
+  setTimeout(measureSizes, 300);
+});
+
+// ══════════════════════════════════════
+//  INIT
+// ══════════════════════════════════════
+setSpeed(40);
+elContent.style.setProperty('--prompt-font-size', '42px');
+</script>
+</body>
+</html>
