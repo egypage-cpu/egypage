@@ -641,7 +641,8 @@ elBtnFaster.addEventListener('click', () => setSpeed(Math.min(120, state.speed +
 elBtnMirror.addEventListener('click', () => {
   state.mirror = !state.mirror;
   elBtnMirror.classList.toggle('on', state.mirror);
-  elViewport.style.transform = state.mirror ? 'scaleX(-1)' : '';
+  const promptScreen = document.getElementById('screen-prompt');
+  promptScreen.style.transform = state.mirror ? 'scaleX(-1)' : '';
 });
 
 // ══════════════════════════════════════
@@ -670,18 +671,18 @@ function initRecognition() {
 
   rec.onspeechstart = () => {
     clearNoSpeech();
-    // When voice detected: pause auto-scroll, let voice drive
+    // تحدث = تمرير. أوقف مؤقت توقف الصمت
     if (state.micActive) {
-      state.voiceMode = true;
+      state.voiceMode = false;
       if (state.voiceSilenceTimer) { clearTimeout(state.voiceSilenceTimer); state.voiceSilenceTimer = null; }
     }
   };
 
   rec.onspeechend = () => {
-    // When silence detected: wait 1.5s then resume auto-scroll
+    // صمت = توقف التمرير بعد 0.8 ثانية
     state.voiceSilenceTimer = setTimeout(() => {
-      state.voiceMode = false;
-    }, 1500);
+      state.voiceMode = true;
+    }, 800);
   };
 
   rec.onnomatch = () => triggerNoSpeech();
@@ -793,7 +794,7 @@ function matchVoiceToScript(transcript) {
 
   if (bestIdx >= 0 && bestIdx !== state.currentWordIdx) {
     highlightWord(bestIdx);
-    if (state.voiceMode) scrollToWord(bestIdx);
+    scrollToWord(bestIdx);
   }
 }
 
